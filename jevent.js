@@ -89,9 +89,12 @@
 
       var i = 0;
       var callback;
-      while (callback = callbacks[i]) {
-        callback(param);
-        i++;
+
+      if (callbacks) {
+        while (callback = callbacks[i]) {
+          callback(param);
+          i++;
+        }
       }
 
       return this;
@@ -113,6 +116,8 @@
           for (var i = 0, len = events.length; i < len; i++) {
             if (callbackId(callback) === callbackId(events[i])) {
               events.splice(i, 1);
+              i--;
+              len--;
             }
           }
           break;
