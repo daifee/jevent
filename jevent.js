@@ -1,47 +1,57 @@
-(function (global) {
+
+(function (global, factory) {
+  'use strict';
+
+  // 执行工厂方法
+  var jEvent = factory(global);
+
+  // 暴露接口
+  if (typeof define === 'function' && (define.amd || define.cmd)) {
+    define(function () {
+      return jEvent;
+    });
+  } else if (typeof module === 'object' && module.exports) {
+    module.exports = jEvent;
+  } else {
+    global.jEvent = jEvent;
+  }
+}(this, function(win) {
   'use strict';
 
   /**
-   * callback id
-   *
-   * 每个绑定的callback会被添加一个属性
-   * property = id_key
-   * value = cid
-   *
+   * id发生器
    */
   var cid = 0;
-  function getCid() {
+
+  function getId() {
     return cid++;
   }
 
-  var id_key = '__jevent_id';
+  /**
+   * 管理回调函数的jevent_id
+   */
+  var callback_id_key = '__jevent_id';
+
   function callbackId(callback, id) {
     if (arguments.length === 1) {
-      return callback[id_key];
+      return callback[callback_id_key];
     } else {
-      callback[id_key] = id;
+      return callback[callback_id_key] = id;
     }
   }
 
+
   /**
-   * callback的容器
-   *
-   * 使用jEvent绑定的callback保存在container
-   * 其他继承jEvent的对象有自己独立的callback容器，容器是自动创建的，用户不可见
-   * 其他继承jEvent的对象会自动添加一个属性，作为callback容器，所以他们的容器是相互独立的
-   * 容器是内部自动创建的
-   * property = container_key
-   * value = {}
+   * 管理callback的容器
    */
   var container = {};
-  var container_key = '__events';
-  function getEventContainer(obj) {
-    // jEvent对象的容器
+  var container_key = '__jevent_container';
+
+  function getContainer(obj) {
     if (obj === jEvent) {
       return container;
     }
 
-    // 继承jEvent对象的其他对象的容器
     if (container_key in obj) {
       return obj[container_key];
     } else {
@@ -49,33 +59,32 @@
     }
   }
 
-  function unsetEventContainer(obj) {
+  function clearContainer(obj) {
     if (obj === jEvent) {
       container = {};
     } else {
-      obj[container_key] = {};
+      delete obj[container_key];
     }
   }
 
-  /**
-   * jEvent 对象
-   */
 
   var jEvent = {
     on: function (key, callback, obj) {
-      var id = getCid();
-      var container = getEventContainer(this);
+      var id = getId();
+      var container = getContainer(this);
       var fn;
 
+      callbackId(callback, id);
+
       if (obj) {
-        callbackId(callback, id);
-        fn = function (param) {
-          callback.call(obj, param)
+        fn = function (arg) {
+          callback.call(obj, arg);
         }
+        // 为了.off()
+        callbackId(fn, id);
       } else {
         fn = callback;
       }
-      callbackId(fn, id);
 
       container[key] || (container[key] = []);
       container[key].push(fn);
@@ -83,17 +92,13 @@
       return this;
     },
 
-    emit: function (key, param) {
-      var container = getEventContainer(this);
+    emit: function (key, arg) {
+      var container = getContainer(this);
       var callbacks = container[key];
 
-      var i = 0;
-      var callback;
-
       if (callbacks) {
-        while (callback = callbacks[i]) {
-          callback(param);
-          i++;
+        for (var i = 0, len = callbacks.length; i < len; i++) {
+          callbacks[i](arg);
         }
       }
 
@@ -101,23 +106,25 @@
     },
 
     off: function (key, callback) {
-      var container = getEventContainer(this);
+      var container = getContainer(this);
 
       switch (arguments.length) {
         case 0:
-          unsetEventContainer(this);
+          clearContainer(this);
           break;
         case 1:
           delete container[key];
           break;
         case 2:
-          var events = container[key];
+          var callbacks = container[key];
+          var i = 0;
+          var cb;
 
-          for (var i = 0, len = events.length; i < len; i++) {
-            if (callbackId(callback) === callbackId(events[i])) {
-              events.splice(i, 1);
-              i--;
-              len--;
+          while (cb = callbacks[i]) {
+            if (callbackId(callback) === callbackId(cb)) {
+              callbacks.splice(i, 1);
+            } else {
+              i++;
             }
           }
           break;
@@ -127,12 +134,8 @@
     }
   };
 
-  global.jEvent = jEvent;
 
-  if (typeof define === 'function' && (define.amd || define.cmd)) {
-    define(function () {
-       return jEvent;
-    });
-  }
+  return jEvent;
+}));
 
-}(this));
+

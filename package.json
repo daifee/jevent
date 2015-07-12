@@ -1,0 +1,34 @@
+{
+  "name": "jevent",
+  "version": "1.0.0",
+  "description": "JS事件管理中枢 jEvent",
+  "main": "jevent.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/epooren/jevent.git"
+  },
+  "keywords": [
+    "jevent",
+    "jEvent",
+    "js",
+    "event",
+    "事件",
+    "管理"
+  ],
+  "author": "daifee",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/epooren/jevent/issues"
+  },
+  "homepage": "https://github.com/epooren/jevent#readme",
+  "devDependencies": {
+    "chai": "^3.0.0",
+    "mocha": "^2.2.5"
+  }
+}
