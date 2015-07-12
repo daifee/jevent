@@ -1,6 +1,6 @@
 {
   "name": "jevent",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "JS事件管理 jEvent",
   "main": "jevent.js",
   "directories": {
