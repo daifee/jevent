@@ -5,7 +5,7 @@ var jEvent = require('./jevent.js');
 // 接口
 function interface(obj) {
   expect(obj.on).to.be.a('function');
-  expect(obj.on).to.have.length(31);
+  expect(obj.on).to.have.length(3);
 
   expect(obj.emit).to.be.a('function');
   expect(obj.emit).to.have.length(2);
