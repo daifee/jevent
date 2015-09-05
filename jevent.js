@@ -1,4 +1,4 @@
-/**
+/*!
  * jEvent
  * author: daifee <mr_zhangjiayong@163.com>
  */
