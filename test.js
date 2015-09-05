@@ -1,229 +1,196 @@
 
-var expect = require('chai').expect;
+var assert = require('chai').assert;
 var jEvent = require('./jevent.js');
+var assign = require('object.assign');
 
-// 接口
-function interface(obj) {
-  expect(obj.on).to.be.a('function');
-  expect(obj.on).to.have.length(3);
 
-  expect(obj.emit).to.be.a('function');
-  expect(obj.emit).to.have.length(2);
+suite('jEvent', function () {
 
-  expect(obj.off).to.be.a('function');
-  expect(obj.off).to.have.length(2);
-}
+  test('#on()', function () {
+    var obj = jEvent
+        .on('on', function () {})
+        .on('on-obj', function () {}, {});
 
-function simple(obj) {
-  var expected = 0;
-
-  obj.on('add', function () {
-    expected = 1;
+    assert.equal(obj, jEvent, '链式调用on()');
   });
 
-  obj.emit('add');
-  expect(expected).to.equal(1);
-}
+  test('#one()', function () {
+    var obj = jEvent
+        .one('one', function () {})
+        .one('one-obj', function () {}, {});
 
-function multiple(obj) {
-  // 多个callback顺序执行
-  obj.on('add', function () {
-    expected = 0;
-  });
-  obj.on('add', function () {
-    expected = expected + 2;
+    assert.equal(obj, jEvent, '链式调用one()');
   });
 
-  // 0+2
-  obj.emit('add');
-  expect(expected).to.equal(2);
+  test('#trigger()', function () {
+    var i = 0;
 
-  obj.on('add', function () {
-    expected = expected + 3;
+    jEvent
+    .on('on', function () {
+      i++;
+    })
+    .one('on', function () {
+      i++;
+    })
+    .on('ignore', function () {
+      i++;
+    });
+
+    var obj = jEvent.trigger('on');
+
+    assert.equal(i, 2, '触发了on()和one()绑定的事件');
+    assert.equal(obj, jEvent, '链式操作');
   });
-  // 0+2+3
-  obj.emit('add');
-  expect(expected).to.equal(5);
-}
 
-function transferArgObj(obj_origin) {
-  var obj = {
-    expected: 0,
-    cb: function (arg) {
-      this.expected = arg;
+  test('#trigger() 传参', function () {
+    var i = 0;
+    jEvent.one('paramater', function (paramater) {
+      i = paramater;
+    });
+    jEvent.trigger('paramater', 23);
+    assert.equal(i, 23, 'i === 23');
+  });
+
+  test('#emit() 传参', function () {
+    var i = 0;
+    jEvent.one('paramater', function (paramater) {
+      i = paramater;
+    });
+    jEvent.emit('paramater', 23);
+    assert.equal(i, 23, 'i === 23');
+  });
+
+
+  test('#off()', function () {
+    var i = 0;
+    jEvent.on('off', function () {
+      i++;
+    });
+    jEvent.off();
+    jEvent.trigger('off');
+    assert.equal(i, 0, '成功接触所有绑定的事件');
+  });
+
+  test('#off() event', function () {
+    jEvent.off();
+
+    var i = 0;
+
+    jEvent
+    .on('off', function () { i++;})
+    .on('ignore', function () { i++;});
+
+    jEvent.off('ignore');
+    jEvent.trigger('off');
+    assert.equal(i, 1, '成功解除绑定的声明函数');
+  });
+
+  test('#off() event handler', function () {
+    jEvent.off();
+
+    var i = 0;
+    var add = function () {
+      i++;
     }
+
+    jEvent
+    .on('off', function () { i++;})
+    .on('off', add)
+    .on('off', function () { i++;});
+
+    jEvent.off('off', add);
+    jEvent.trigger('off');
+    assert.equal(i, 2, '成功解除绑定的声明函数&对象');
+  });
+
+
+  test('#off() event handler obj', function () {
+    jEvent.off();
+
+    var i = 0;
+    var obj = {};
+    var add = function () {
+      i++;
+    }
+    jEvent
+    .on('off', function () { i++;})
+    .on('off', add)
+    .on('off', add, obj);
+
+    jEvent.off('off', add, obj);
+    jEvent.trigger('off');
+    assert.equal(i, 2, '成功解除绑定的声明函数&对象');
+  });
+
+  test('#change() 绑定的事件', function () {
+    jEvent.off();
+
+    var i = 0;
+
+    jEvent
+    .change(function () { i++})
+    // = jEvent.trigger('change');
+    .change();
+
+    assert.equal(i, 1, 'change');
+  });
+
+  test('#change() 传参', function () {
+    jEvent.off();
+
+    var i = 0;
+
+    jEvent
+    .change(function (paramater) { i = paramater;})
+    // = .trigger('change', 32);
+    .change(32);
+
+    assert.equal(i, 32, 'i === 32');
+  });
+
+  test('#offChange()', function () {
+    jEvent.off();
+
+    var i = 0;
+
+    jEvent
+    .change(function (paramater) { i = paramater;})
+    .offChange()
+    .change(32);
+
+    assert.equal(i, 0, 'i === 0');
+  });
+});
+
+
+suite('extend jEvent', function () {
+  var fuck_gfw = {
+    name: 'fuck'
   };
 
-  obj_origin.on('obj', obj.cb);
-  obj_origin.emit('obj');
-  expect(obj.expected).to.equal(0);
-
-  obj_origin.on('obj', obj.cb, obj);
-  obj_origin.emit('obj', 1);
-  expect(obj.expected).to.equal(1);
-}
-
-
-function offEvent(obj) {
-  var expected = 0;
-
-  obj.on('off', function () {
-    expected++;
-  });
-  obj.on('heloo', function () {
-    expected++;
+  setup(function () {
+    assign(fuck_gfw, jEvent);
   });
 
-  obj.off();
-  obj.emit('off');
-  obj.emit('heloo');
-  expect(expected).to.equal(0);
-}
+  test('#off() event handler obj', function () {
+    fuck_gfw.off();
 
-function offEventKey(obj) {
-  var expected = 0;
+    var i = 0;
+    var obj = {};
+    var add = function () {
+      i++;
+    }
+    fuck_gfw
+    .on('off', function () { i++;})
+    .on('off', add)
+    .on('off', add, obj);
 
-  obj.on('off', function () {
-    expected = 3;
-  });
-  obj.on('heloo', function () {
-    expected = 5;
-  });
-
-  obj.off('off');
-  obj.emit('off');
-  expect(expected).to.equal(0);
-  obj.emit('heloo');
-  expect(expected).to.equal(5);
-}
-
-
-function offEventCb(obj) {
-  var expected = 0;
-
-  function add() {
-    expected++;
-  }
-
-  obj.on('off', add);
-  obj.on('off', add);
-  obj.on('off', function () {
-    expected++;
-  });
-
-  obj.off('off', add);
-  obj.emit('off');
-  expect(expected).to.equal(1);
-}
-
-
-describe('jEvent', function () {
-  describe('interface', function () {
-    it('the function has three argument', function () {
-      interface(jEvent);
-    });
+    fuck_gfw.off('off', add, obj);
+    fuck_gfw.trigger('off');
+    assert.equal(i, 2, '成功解除绑定的声明函数&对象');
   });
 });
 
 
-describe('jEvent', function () {
-  describe('.on() & .emit()', function () {
-    beforeEach(function () {
-      jEvent.off();
-    });
-
-    it('simple', function () {
-      simple(jEvent);
-    });
-
-    it('multiple', function () {
-      multiple(jEvent);
-    });
-
-    it('transfer arg * obj', function () {
-      transferArgObj(jEvent);
-    });
-  });
-
-
-  describe('.off', function () {
-    beforeEach(function () {
-      jEvent.off();
-    });
-
-    it('off()', function () {
-      offEvent(jEvent);
-    });
-
-    it('off(key)', function () {
-      offEventKey(jEvent);
-    });
-
-    it('off(key, callback)', function () {
-      offEventCb(jEvent);
-    });
-
-  });
-});
-
-
-
-// 继承
-var subEvent = {};
-for (var key in jEvent) {
-  if (jEvent.hasOwnProperty(key)) {
-    subEvent[key] = jEvent[key];
-  }
-}
-
-describe('subEvent', function () {
-  describe('interface', function () {
-    it('the function has three argument', function () {
-      interface(subEvent);
-    });
-  });
-});
-
-
-
-describe('subEvent', function () {
-  describe('.on() & .emit()', function () {
-    beforeEach(function () {
-      subEvent.off();
-    });
-
-    it('simple', function () {
-      simple(subEvent);
-    });
-
-    it('multiple', function () {
-      multiple(subEvent);
-    });
-
-    it('transfer arg * obj', function () {
-      transferArgObj(subEvent);
-    });
-  });
-
-
-  describe('.off', function () {
-    beforeEach(function () {
-      subEvent.off();
-    });
-
-    it('off()', function () {
-      offEvent(subEvent);
-    });
-
-    it('off(key)', function () {
-      offEventKey(subEvent);
-    });
-
-    it('off(key, callback)', function () {
-      offEventCb(subEvent);
-    });
-
-  });
-});
 
 

@@ -1,141 +1,229 @@
+/**
+ * jEvent
+ * author: daifee <mr_zhangjiayong@163.com>
+ */
 
-(function (global, factory) {
-  'use strict';
 
-  // 执行工厂方法
-  var jEvent = factory(global);
+function Listener(meta) {
+  this.event = meta.event;
+  this.handler = meta.handler;
+  this.obj = meta.obj;
+}
 
-  // 暴露接口
-  if (typeof define === 'function' && (define.amd || define.cmd)) {
-    define(function () {
-      return jEvent;
-    });
-  } else if (typeof module === 'object' && module.exports) {
-    module.exports = jEvent;
-  } else {
-    global.jEvent = jEvent;
+Listener.prototype.emit = function (paramter) {
+  this.handler.call(this.obj, paramter);
+};
+
+
+function Listeners() {
+  this.models = [];
+}
+
+Listeners.prototype.each = function (callback) {
+  for (var i = 0, len = this.models.length; i < len; i++) {
+    callback.call(this, this.models[i], i);
   }
-}(this, function(win) {
-  'use strict';
+};
 
-  /**
-   * id发生器
-   */
-  var cid = 0;
+Listeners.prototype.add = function (listener) {
+  var added = false;
 
-  function getId() {
-    return cid++;
-  }
-
-  /**
-   * 管理回调函数的jevent_id
-   */
-  var callback_id_key = '__jevent_id';
-
-  function callbackId(callback, id) {
-    if (arguments.length === 1) {
-      return callback[callback_id_key];
-    } else {
-      return callback[callback_id_key] = id;
-    }
-  }
-
-
-  /**
-   * 管理callback的容器
-   */
-  var container = {};
-  var container_key = '__jevent_container';
-
-  function getContainer(obj) {
-    if (obj === jEvent) {
-      return container;
-    }
-
-    if (container_key in obj) {
-      return obj[container_key];
-    } else {
-      return obj[container_key] = {};
-    }
-  }
-
-  function clearContainer(obj) {
-    if (obj === jEvent) {
-      container = {};
-    } else {
-      delete obj[container_key];
-    }
-  }
-
-
-  var jEvent = {
-    on: function (key, callback, obj) {
-      var id = getId();
-      var container = getContainer(this);
-      var fn;
-
-      callbackId(callback, id);
-
-      if (obj) {
-        fn = function (arg) {
-          callback.call(obj, arg);
-        }
-        // 为了.off()
-        callbackId(fn, id);
+  this.each(function (model) {
+    // 已存在handler
+    if (model.handler === listener.handler) {
+      // 定义了obj，还要判断handler是否对应同一个obj
+      if (listener.obj) {
+        model.obj === listener.obj && (added = true);
       } else {
-        fn = callback;
+        added = true;
       }
+    }
+  });
 
-      container[key] || (container[key] = []);
-      container[key].push(fn);
+  added === false && (this.models.push(listener));
+};
 
-      return this;
-    },
+Listeners.prototype.resetModels = function (models) {
+  this.models = models;
+};
 
-    emit: function (key, arg) {
-      var container = getContainer(this);
-      var callbacks = container[key];
+/**
+ * jEvent绑定的事件集合
+ * 扩展（extend）jEvent的子对象，除了添加jEvent的接口，
+ * 还会增加一个属性：`._jevent_collection`保存其绑定的事件
+ */
+var collection = new Listeners();
 
-      if (callbacks) {
-        for (var i = 0, len = callbacks.length; i < len; i++) {
-          callbacks[i](arg);
-        }
+var getCollection = function (obj) {
+  var listeners;
+
+  if (obj === jEvent) {
+    listeners = collection;
+  } else {
+    // ! 比 instanceof 高级
+    if (!(obj._jevent_collection instanceof Listeners)) {
+      obj._jevent_collection = new Listeners();
+    }
+
+    listeners = obj._jevent_collection;
+  }
+
+  return listeners;
+};
+
+
+var jEvent = {
+
+  /**
+   * 绑定事件
+   * @param  {string} event   事件名称
+   * @param  {function} handler 事件监听函数
+   * @param  {object} obj     handler.call(obj, ...)
+   * @return {object}         this
+   */
+  on: function (event, handler, obj) {
+    var meta = {
+      'event': event,
+      'handler': handler,
+      'obj': obj
+    };
+
+    var listener = new Listener(meta);
+    var listeners = getCollection(this);
+    listeners.add(listener);
+
+    return this;
+  },
+
+  /**
+   * 绑定事件，只会被触发一次
+   * @param  {string} event   事件名称
+   * @param  {function} handler 事件监听函数
+   * @param  {object} obj     handler.call(obj, ...)
+   * @return {object}         this
+   */
+  one: function (event, handler, obj) {
+    var meta = {
+      'event': event,
+      'handler': handler,
+      'obj': obj,
+      'one': true
+    };
+
+    var listener = new Listener(meta);
+    var listeners = getCollection(this);
+    listeners.add(listener);
+
+    return this;
+  },
+
+  /**
+   * 触发事件
+   * @param  {string} event    事件名称
+   * @param  {mix} paramter 传入`handler()`的参数
+   * @return {object}          this
+   */
+  trigger: function (event, paramter) {
+    var listeners = getCollection(this);
+    var models = [];
+
+    listeners.each(function (listener) {
+      if (event === listener.event) {
+        listener.emit(paramter);
+
+        // this === listeners
+        if (!listener.one) models.push(listener);
       }
+    });
 
-      return this;
-    },
+    listeners.resetModels(models);
 
-    off: function (key, callback) {
-      var container = getContainer(this);
+    // this === who.trigger()
+    return this;
+  },
 
-      switch (arguments.length) {
-        case 0:
-          clearContainer(this);
-          break;
+  /**
+   * alias of `trigger`
+   * @param  {[type]} event    [description]
+   * @param  {[type]} paramter [description]
+   * @return {[type]}          [description]
+   */
+  emit: function (event, paramter) {
+    return this.trigger(event, paramter);
+  },
+
+  /**
+   * 移除事件监听
+   * @param  {string} event   事件名称
+   * @param  {function} handler 监听事件的函数
+   * @param  {object} obj     对应`on()`的第3个参数
+   * @return {object}         this
+   */
+  off: function (event, handler, obj) {
+    var listeners = getCollection(this);
+    var models = [];
+    var arg_len = 0;
+
+    // fuck offChange(handler, obj);
+    for (var i = 0, len = arguments.length; i < len; i++) {
+      typeof arguments[i] !== 'undefined' && (arg_len++);
+    }
+
+    listeners.each(function (listener) {
+      // this === listeners
+      switch (arg_len) {
         case 1:
-          delete container[key];
+          if (listener.event !== event) models.push(listener);
           break;
         case 2:
-          var callbacks = container[key];
-          var i = 0;
-          var cb;
-
-          while (cb = callbacks[i]) {
-            if (callbackId(callback) === callbackId(cb)) {
-              callbacks.splice(i, 1);
-            } else {
-              i++;
-            }
+          if (listener.event !== event || listener.handler !== handler) {
+            models.push(listener);
+          }
+          break;
+        case 3:
+          if (listener.event !== event
+              || listener.handler !== handler
+              || listener.obj !== obj) {
+            models.push(listener);
           }
           break;
       }
+    });
 
-      return this;
+    listeners.resetModels(models);
+
+    // this === who.off()
+    return this;
+  },
+
+  /**
+   * 1. `typeof mix === "function"`时，等同于`.on('change', mix, obj)`
+   * 2. 否则，等同于`.trigger('change', mix, obj)`
+   * @param  {mix} mix 第1种，`mix = handler`；第二种，`mix = paramter`
+   * @param  {object} obj 只有第1种情况才有该参数
+   * @return {object}     this
+   */
+  change: function (mix, obj) {
+    // on(); mix === handler
+    if (typeof mix === 'function') {
+      return this.on('change', mix, obj);
+
+    // trigger(); mix === paramter
+    } else {
+      return this.trigger('change', mix);
     }
-  };
+  },
+
+  /**
+   * `.off('change', handler, obj)`的简写
+   * @param  {[type]} handler [description]
+   * @param  {[type]} obj     [description]
+   * @return {[type]}         [description]
+   */
+  offChange: function (handler, obj) {
+    return this.off('change', handler, obj);
+  }
+};
 
 
-  return jEvent;
-}));
-
-
+module.exports = jEvent;
