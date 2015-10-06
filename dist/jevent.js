@@ -189,6 +189,8 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	        // this === listeners
 	        if (!listener.one) models.push(listener);
+	      } else {
+	        models.push(listener);
 	      }
 	    });
 

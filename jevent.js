@@ -133,6 +133,8 @@ var jEvent = {
 
         // this === listeners
         if (!listener.one) models.push(listener);
+      } else {
+        models.push(listener);
       }
     });
 

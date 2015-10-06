@@ -192,5 +192,29 @@ suite('extend jEvent', function () {
 });
 
 
+/**
+ * get a bug
+ */
+suite('trigger bug', function () {
+  setup(function () {
+    jEvent.off();
+  });
 
+  test('#trigger()', function () {
+    var i = 0;
+
+    jEvent.on('cancel', function () {
+      i++;
+    });
+
+    jEvent.on('confirm', function () {
+      i++;
+    });
+
+    jEvent.trigger('cancel');
+    jEvent.trigger('confirm');
+
+    assert.equal(i, 2, 'fix the bug');
+  });
+});
 
